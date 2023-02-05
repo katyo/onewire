@@ -10,11 +10,22 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2018"
 
-[lib]
-
 [dependencies]
 byteorder = { version = "1", default-features = false }
 
 [dependencies.embedded-hal]
 features = ["unproven"]
-version = "0.2.1"
+version = "0.2.7"
+
+[dev-dependencies.cortex-m]
+version = "0.7"
+
+[dev-dependencies.stm32f1xx-hal]
+version = "0.10"
+features = ["stm32f103"]
+
+[features]
+default = ["rw1990", "ds18b20"]
+ds1990 = []
+rw1990 = ["ds1990"]
+ds18b20 = []

@@ -1,16 +1,10 @@
-use byteorder::ByteOrder;
-use byteorder::LittleEndian;
+use byteorder::{ByteOrder, LittleEndian};
+use embedded_hal::blocking::delay::DelayUs;
+
+use crate::{Address, Device, Driver, Error, IoWire, OpCode, Sensor};
 use core::fmt::Debug;
-use hal::blocking::delay::DelayUs;
 
-use crate::Error;
-use crate::OneWire;
-use crate::Sensor;
-use crate::{Device, OpenDrainOutput};
-use core::convert::Infallible;
-
-pub const FAMILY_CODE: u8 = 0x28;
-
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Command {
     Convert = 0x44,
@@ -21,8 +15,14 @@ pub enum Command {
     ReadPowerSupply = 0xB4,
 }
 
+impl OpCode for Command {
+    fn op_code(&self) -> u8 {
+        *self as _
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
 pub enum MeasureResolution {
     TC8 = 0b0001_1111,
     TC4 = 0b0011_1111,
@@ -41,57 +41,43 @@ impl MeasureResolution {
     }
 }
 
-pub struct DS18B20 {
-    device: Device,
+#[derive(Debug, Clone, Copy)]
+pub struct Ds18b20 {
+    address: Address,
     resolution: MeasureResolution,
 }
 
-impl DS18B20 {
-    pub fn new(device: Device) -> Result<DS18B20, Error<Infallible>> {
-        if device.address[0] != FAMILY_CODE {
-            Err(Error::FamilyCodeMismatch(FAMILY_CODE, device.address[0]))
-        } else {
-            Ok(DS18B20 {
-                device,
-                resolution: MeasureResolution::TC,
-            })
-        }
+impl From<Ds18b20> for Address {
+    fn from(device: Ds18b20) -> Self {
+        device.address
     }
+}
 
-    /// # Safety
-    ///
-    /// This is marked as unsafe because it does not check whether the given address
-    /// is compatible with a DS18B20 device. It assumes so.
-    pub unsafe fn new_forced(device: Device) -> DS18B20 {
-        DS18B20 {
-            device,
-            resolution: MeasureResolution::TC,
-        }
-    }
-
-    pub fn measure_temperature<O: OpenDrainOutput>(
+impl Ds18b20 {
+    pub fn measure_temperature<W: IoWire>(
         &self,
-        wire: &mut OneWire<O>,
+        driver: &mut Driver<W>,
         delay: &mut impl DelayUs<u16>,
-    ) -> Result<MeasureResolution, Error<O::Error>> {
-        wire.reset_select_write_only(delay, &self.device, &[Command::Convert as u8])?;
+    ) -> Result<MeasureResolution, Error<W::Error>> {
+        driver.reset_select_write_only(delay, &self.address, &[Command::Convert.op_code()])?;
         Ok(self.resolution)
     }
 
-    pub fn read_temperature<O: OpenDrainOutput>(
+    pub fn read_temperature<W: IoWire>(
         &self,
-        wire: &mut OneWire<O>,
+        driver: &mut Driver<W>,
         delay: &mut impl DelayUs<u16>,
-    ) -> Result<u16, Error<O::Error>> {
+    ) -> Result<u16, Error<W::Error>> {
         let mut scratchpad = [0u8; 9];
-        wire.reset_select_write_read(
+        driver.reset_select_write_read(
             delay,
-            &self.device,
-            &[Command::ReadScratchpad as u8],
+            &self.address,
+            &[Command::ReadScratchpad.op_code()],
             &mut scratchpad[..],
         )?;
-        super::ensure_correct_rcr8(&self.device, &scratchpad[..8], scratchpad[8])?;
-        Ok(DS18B20::read_temperature_from_scratchpad(&scratchpad))
+        self.address
+            .ensure_correct_crc8(&scratchpad[..8], scratchpad[8])?;
+        Ok(Self::read_temperature_from_scratchpad(&scratchpad))
     }
 
     fn read_temperature_from_scratchpad(scratchpad: &[u8]) -> u16 {
@@ -99,34 +85,45 @@ impl DS18B20 {
     }
 }
 
-impl Sensor for DS18B20 {
-    fn family_code() -> u8 {
-        FAMILY_CODE
+impl Device for Ds18b20 {
+    const FAMILY_CODE: u8 = 0x28;
+
+    fn address(&self) -> &Address {
+        &self.address
     }
 
-    fn start_measurement<O: OpenDrainOutput>(
+    unsafe fn from_address_unchecked(address: Address) -> Self {
+        Self {
+            address,
+            resolution: MeasureResolution::TC,
+        }
+    }
+}
+
+impl Sensor for Ds18b20 {
+    fn start_measurement<W: IoWire>(
         &self,
-        wire: &mut OneWire<O>,
+        driver: &mut Driver<W>,
         delay: &mut impl DelayUs<u16>,
-    ) -> Result<u16, Error<O::Error>> {
-        Ok(self.measure_temperature(wire, delay)?.time_ms())
+    ) -> Result<u16, Error<W::Error>> {
+        Ok(self.measure_temperature(driver, delay)?.time_ms())
     }
 
-    fn read_measurement<O: OpenDrainOutput>(
+    fn read_measurement<W: IoWire>(
         &self,
-        wire: &mut OneWire<O>,
+        driver: &mut Driver<W>,
         delay: &mut impl DelayUs<u16>,
-    ) -> Result<f32, Error<O::Error>> {
-        self.read_temperature(wire, delay)
+    ) -> Result<f32, Error<W::Error>> {
+        self.read_temperature(driver, delay)
             .map(|t| t as i16 as f32 / 16_f32)
     }
 
-    fn read_measurement_raw<O: OpenDrainOutput>(
+    fn read_measurement_raw<W: IoWire>(
         &self,
-        wire: &mut OneWire<O>,
+        driver: &mut Driver<W>,
         delay: &mut impl DelayUs<u16>,
-    ) -> Result<u16, Error<O::Error>> {
-        self.read_temperature(wire, delay)
+    ) -> Result<u16, Error<W::Error>> {
+        self.read_temperature(driver, delay)
     }
 }
 

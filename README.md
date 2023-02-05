@@ -8,58 +8,52 @@ This crate is an OneWire-Bus implementation ontop of generic `Input-` and `Outpu
 [![Documentation](https://docs.rs/onewire/badge.svg)](https://docs.rs/onewire)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kellerkindt/onewire/issues/new)
 
-
-
 # How to use
-Below is an example how to create a new OneWire instance, search for devices and read the temperature from a [DS18B20](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwjY3ZaK3ZTcAhUwb5oKHeW1AaYQFghhMAA&url=https%3A%2F%2Fdatasheets.maximintegrated.com%2Fen%2Fds%2FDS18B20.pdf&usg=AOvVaw1BHiiWuK-ej9DummvLpx8c).
-The example currently requires the stm32f103xx-hal to be patched with this [PR](https://github.com/japaric/stm32f103xx-hal/pull/51).
 
-```rust
+Below is an example how to create a new `Driver` instance, search for devices and read the temperature from a [DS18B20](https://datasheets.maximintegrated.com/en/ds/ds18b20.pdf).
+
+```rust,no_run
+use onewire::{Driver, ds18b20::Ds18b20, DeviceSearch, Device};
+use stm32f1xx_hal::prelude::*;
+
 fn main() -> ! {
-    let mut cp: cortex_m::Peripherals = cortex_m::Peripherals::take().unwrap();
-    let mut peripherals = stm32f103xx::Peripherals::take().unwrap();
-    let mut flash = peripherals.FLASH.constrain();
+    let mut cp = cortex_m::Peripherals::take().unwrap();
+    let mut dp = stm32f1xx_hal::pac::Peripherals::take().unwrap();
+    let mut flash = dp.FLASH.constrain();
+    let mut rcc = dp.RCC.constrain();
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
-    let mut rcc = peripherals.RCC.constrain();
-    let mut gpioc = peripherals.GPIOC.split(&mut rcc.apb2);
-    
-    let mut delay = stm32f103xx_hal::delay::Delay::new(cp.SYST, clocks);
-    
-    let mut one = gpioc
-        .pc15
-        .into_open_drain_output(&mut gpioc.crh)
-        .downgrade();
-        
-    let mut wire = OneWire::new(&mut one, false);
-    
-    if wire.reset(&mut delay).is_err() {
-        // missing pullup or error on line
-        loop {}
-    }
-    
+    let mut gpioc = dp.GPIOC.split();
+
+    let mut delay = cp.SYST.delay(&clocks);
+    let pin = gpioc.pc15.into_open_drain_output(&mut gpioc.crh);
+    let mut driver = Driver::new((pin,), false);
+
+    driver.reset(&mut delay).unwrap();
+
     // search for devices
     let mut search = DeviceSearch::new();
-    while let Some(device) = wire.search_next(&mut search, &mut delay).unwrap() {
-        match device.address[0] {
-            ds18b20::FAMILY_CODE => {
-                let mut ds18b20 = DS18b20::new(device).unwrap();
-                
+    while let Some(address) = driver.search_next(&mut search, &mut delay).unwrap() {
+        match address.family_code() {
+            Ds18b20::FAMILY_CODE => {
+                let mut ds18b20 = Ds18b20::from_address::<()>(address).unwrap();
+
                 // request sensor to measure temperature
-                let resolution = ds18b20.measure_temperature(&mut wire, &mut delay).unwrap();
-                
-                // wait for compeltion, depends on resolution 
+                let resolution = ds18b20.measure_temperature(&mut driver, &mut delay).unwrap();
+
+                // wait for compeltion, depends on resolution
                 delay.delay_ms(resolution.time_ms());
-                
+
                 // read temperature
-                let temperature = ds18b20.read_temperature(&mut wire, &mut delay).unwrap();
+                let temperature = ds18b20.read_temperature(&mut driver, &mut delay).unwrap();
             },
             _ => {
-                // unknown device type            
+                // unknown device type
             }
         }
     }
-    
+
     loop {}
 }
 ```
-The code from the example is copy&pasted from a working project, but not tested in this specific combination. 
+
+The code from the example is copy&pasted from a working project, but not tested in this specific combination.
