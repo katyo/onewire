@@ -1,6 +1,6 @@
 use crate::{Address, Driver, Error, IoWire};
 use core::fmt::Debug;
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 /// Generic device interface
 pub trait Device: Sized {
@@ -32,7 +32,7 @@ pub trait Device: Sized {
 
     fn search_first<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Option<Self>, Error<W::Error>> {
         Address::search_first(driver, delay, Self::FAMILY_CODE)
             .map(|res| res.map(|address| unsafe { Self::from_address_unchecked(address) }))
@@ -40,7 +40,7 @@ pub trait Device: Sized {
 
     fn get_single<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Self, Error<W::Error>> {
         let address = Address::get_single(driver, delay)?;
         Self::from_address(address)

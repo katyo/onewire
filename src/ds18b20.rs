@@ -1,5 +1,5 @@
 use byteorder::{ByteOrder, LittleEndian};
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 use crate::{Address, Device, Driver, Error, IoWire, OpCode, Sensor};
 use core::fmt::Debug;
@@ -57,7 +57,7 @@ impl Ds18b20 {
     pub fn measure_temperature<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<MeasureResolution, Error<W::Error>> {
         driver.reset_select_write_only(delay, &self.address, &[Command::Convert.op_code()])?;
         Ok(self.resolution)
@@ -66,7 +66,7 @@ impl Ds18b20 {
     pub fn read_temperature<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<u16, Error<W::Error>> {
         let mut scratchpad = [0u8; 9];
         driver.reset_select_write_read(
@@ -104,7 +104,7 @@ impl Sensor for Ds18b20 {
     fn start_measurement<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<u16, Error<W::Error>> {
         Ok(self.measure_temperature(driver, delay)?.time_ms())
     }
@@ -112,7 +112,7 @@ impl Sensor for Ds18b20 {
     fn read_measurement<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<f32, Error<W::Error>> {
         self.read_temperature(driver, delay)
             .map(|t| t as i16 as f32 / 16_f32)
@@ -121,7 +121,7 @@ impl Sensor for Ds18b20 {
     fn read_measurement_raw<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<u16, Error<W::Error>> {
         self.read_temperature(driver, delay)
     }

@@ -1,18 +1,13 @@
 use crate::{Address, Command, Driver, Error, IoWire};
 use core::fmt::Debug;
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 enum SearchState {
+    #[default]
     Initialized,
     DeviceFound,
     End,
-}
-
-impl Default for SearchState {
-    fn default() -> Self {
-        SearchState::Initialized
-    }
 }
 
 #[derive(Clone, Default)]
@@ -114,8 +109,8 @@ impl DeviceSearch {
     pub fn into_iter<'a, W: IoWire>(
         self,
         wire: &'a mut Driver<W>,
-        delay: &'a mut impl DelayUs<u16>,
-    ) -> DeviceSearchIter<'a, W, impl DelayUs<u16>> {
+        delay: &'a mut impl DelayUs,
+    ) -> DeviceSearchIter<'a, W, impl DelayUs> {
         DeviceSearchIter {
             search: Some(self),
             wire,
@@ -124,13 +119,13 @@ impl DeviceSearch {
     }
 }
 
-pub struct DeviceSearchIter<'a, W: IoWire, Delay: DelayUs<u16>> {
+pub struct DeviceSearchIter<'a, W: IoWire, Delay: DelayUs> {
     search: Option<DeviceSearch>,
     wire: &'a mut Driver<W>,
     delay: &'a mut Delay,
 }
 
-impl<'a, W: IoWire, Delay: DelayUs<u16>> Iterator for DeviceSearchIter<'a, W, Delay> {
+impl<'a, W: IoWire, Delay: DelayUs> Iterator for DeviceSearchIter<'a, W, Delay> {
     type Item = Result<Address, Error<W::Error>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -149,7 +144,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
     pub(crate) fn search(
         &mut self,
         rom: &mut DeviceSearch,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         cmd: Command,
     ) -> Result<Option<Address>, Error<E>> {
         if SearchState::End == rom.state {

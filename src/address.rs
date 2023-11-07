@@ -4,7 +4,7 @@ use core::{
     ops::{Deref, DerefMut},
     str::FromStr,
 };
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(transparent)]
@@ -91,7 +91,7 @@ pub enum AddressError {
 
 fn hex_to_u8(c: char) -> Option<u8> {
     //let b = c as u32;
-    if ('0'..='9').contains(&c) {
+    if c.is_ascii_digit() {
         Some((c as u32 - '0' as u32) as _)
     } else if ('a'..='f').contains(&c) {
         Some((c as u32 - 'a' as u32 + 10) as _)
@@ -139,7 +139,7 @@ impl Address {
     pub fn read_single<W: IoWire>(
         &mut self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<(), Error<W::Error>> {
         driver.reset_write_read(delay, &[Command::ReadRom.op_code()], self.as_mut())?;
         Ok(())
@@ -147,7 +147,7 @@ impl Address {
 
     pub fn get_single<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Self, Error<W::Error>> {
         let mut address = Self::default();
         address.read_single(driver, delay)?;
@@ -156,7 +156,7 @@ impl Address {
 
     pub fn search_first<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         family_code: u8,
     ) -> Result<Option<Self>, Error<W::Error>> {
         let mut search = DeviceSearch::new();

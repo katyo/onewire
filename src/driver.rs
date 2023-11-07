@@ -1,6 +1,6 @@
 use crate::{Address, Command, DeviceSearch, Error, IoWire, OpCode};
 use core::fmt::Debug;
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 pub struct Driver<W: IoWire> {
     io_wire: W,
@@ -17,7 +17,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_write_read(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         write: &[u8],
         read: &mut [u8],
     ) -> Result<(), Error<E>> {
@@ -29,7 +29,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_read_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         read: &mut [u8],
     ) -> Result<(), Error<E>> {
         self.reset(delay)?;
@@ -39,7 +39,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_write_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         write: &[u8],
     ) -> Result<(), Error<E>> {
         self.reset(delay)?;
@@ -49,7 +49,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_select_write_read(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         addr: &Address,
         write: &[u8],
         read: &mut [u8],
@@ -63,7 +63,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_select_read_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         addr: &Address,
         read: &mut [u8],
     ) -> Result<(), Error<E>> {
@@ -76,7 +76,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_select_write_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         addr: &Address,
         write: &[u8],
     ) -> Result<(), Error<E>> {
@@ -89,7 +89,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_skip_write_read(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         write: &[u8],
         read: &mut [u8],
     ) -> Result<(), Error<E>> {
@@ -102,7 +102,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_skip_read_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         read: &mut [u8],
     ) -> Result<(), Error<E>> {
         self.reset(delay)?;
@@ -113,7 +113,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn reset_skip_write_only(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         write: &[u8],
     ) -> Result<(), Error<E>> {
         self.reset(delay)?;
@@ -122,17 +122,13 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Ok(())
     }
 
-    pub fn skip(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error<E>> {
+    pub fn skip(&mut self, delay: &mut impl DelayUs) -> Result<(), Error<E>> {
         let parasite_mode = self.parasite_mode;
         self.write_command(delay, Command::SkipRom, parasite_mode)?; // skip
         Ok(())
     }
 
-    pub fn select(
-        &mut self,
-        delay: &mut impl DelayUs<u16>,
-        addr: &Address,
-    ) -> Result<(), Error<E>> {
+    pub fn select(&mut self, delay: &mut impl DelayUs, addr: &Address) -> Result<(), Error<E>> {
         let parasite_mode = self.parasite_mode;
         self.write_command(delay, Command::MatchRom, parasite_mode)?; // select
         for i in 0..Address::BYTES {
@@ -145,7 +141,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
     pub fn search_next(
         &mut self,
         search: &mut DeviceSearch,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Option<Address>, Error<E>> {
         self.search(search, delay, Command::SearchRom)
     }
@@ -153,7 +149,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
     pub fn search_next_alarmed(
         &mut self,
         search: &mut DeviceSearch,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Option<Address>, Error<E>> {
         self.search(search, delay, Command::SearchRomAlarmed)
     }
@@ -162,7 +158,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
     /// Returns Err(WireFault) if the wire seems to be shortened,
     /// Ok(true) if presence pulse has been received and Ok(false)
     /// if no other device was detected but the wire seems to be ok
-    pub fn reset(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error<E>> {
+    pub fn reset(&mut self, delay: &mut impl DelayUs) -> Result<(), Error<E>> {
         // let mut cli = DisableInterrupts::new();
         self.set_high()?;
         // drop(cli);
@@ -190,7 +186,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         }
     }
 
-    pub fn reset_presence(&mut self, delay: &mut impl DelayUs<u16>) -> Result<bool, Error<E>> {
+    pub fn reset_presence(&mut self, delay: &mut impl DelayUs) -> Result<bool, Error<E>> {
         self.reset(delay).map(|_| true).or_else(|error| {
             if matches!(error, Error::NoPresence) {
                 Ok(false)
@@ -200,7 +196,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         })
     }
 
-    fn ensure_wire_high(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error<E>> {
+    fn ensure_wire_high(&mut self, delay: &mut impl DelayUs) -> Result<(), Error<E>> {
         for _ in 0..125 {
             if self.is_high()? {
                 return Ok(());
@@ -210,14 +206,14 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Err(Error::WireFault)
     }
 
-    pub fn read_bytes(&mut self, delay: &mut impl DelayUs<u16>, dst: &mut [u8]) -> Result<(), E> {
+    pub fn read_bytes(&mut self, delay: &mut impl DelayUs, dst: &mut [u8]) -> Result<(), E> {
         for d in dst {
             *d = self.read_byte(delay)?;
         }
         Ok(())
     }
 
-    pub(crate) fn read_byte(&mut self, delay: &mut impl DelayUs<u16>) -> Result<u8, E> {
+    pub(crate) fn read_byte(&mut self, delay: &mut impl DelayUs) -> Result<u8, E> {
         let mut byte = 0_u8;
         for _ in 0..8 {
             byte >>= 1;
@@ -228,7 +224,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Ok(byte)
     }
 
-    pub(crate) fn read_bit(&mut self, delay: &mut impl DelayUs<u16>) -> Result<bool, E> {
+    pub(crate) fn read_bit(&mut self, delay: &mut impl DelayUs) -> Result<bool, E> {
         // let cli = DisableInterrupts::new();
         self.set_low()?;
         delay.delay_us(3);
@@ -242,14 +238,14 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub fn write_command(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         cmd: impl OpCode,
         parasite_mode: bool,
     ) -> Result<(), E> {
         self.write_byte(delay, cmd.op_code(), parasite_mode)
     }
 
-    pub fn write_bytes(&mut self, delay: &mut impl DelayUs<u16>, bytes: &[u8]) -> Result<(), E> {
+    pub fn write_bytes(&mut self, delay: &mut impl DelayUs, bytes: &[u8]) -> Result<(), E> {
         for b in bytes {
             self.write_byte(delay, *b, false)?;
         }
@@ -259,7 +255,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub(crate) fn write_byte(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         byte: u8,
         parasite_mode: bool,
     ) -> Result<(), E> {
@@ -272,7 +268,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Ok(())
     }
 
-    pub(crate) fn write_bit(&mut self, delay: &mut impl DelayUs<u16>, high: bool) -> Result<(), E> {
+    pub(crate) fn write_bit(&mut self, delay: &mut impl DelayUs, high: bool) -> Result<(), E> {
         // let cli = DisableInterrupts::new();
         self.set_low()?;
         delay.delay_us(if high { 10 } else { 65 });

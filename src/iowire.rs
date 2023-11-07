@@ -1,8 +1,7 @@
-use core::fmt::Debug;
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::{Error, ErrorType, InputPin, OutputPin};
 
 pub trait IoWire {
-    type Error: Sized + Debug;
+    type Error: Error;
 
     /// Is the input pin high?
     fn is_high(&self) -> Result<bool, Self::Error>;
@@ -24,12 +23,11 @@ pub trait IoWire {
 }
 
 /// Single line config wrapper
-impl<E, IO> IoWire for (IO,)
+impl<IO> IoWire for (IO,)
 where
-    E: Debug,
-    IO: OutputPin<Error = E> + InputPin<Error = E>,
+    IO: ErrorType + OutputPin + InputPin,
 {
-    type Error = E;
+    type Error = IO::Error;
 
     fn is_high(&self) -> Result<bool, Self::Error> {
         self.0.is_high()
@@ -51,9 +49,9 @@ where
 /// Dual line config wrapper
 impl<E, I, O> IoWire for (I, O)
 where
-    E: Debug,
-    I: InputPin<Error = E>,
-    O: OutputPin<Error = E>,
+    E: Error,
+    I: ErrorType<Error = E> + InputPin,
+    O: ErrorType<Error = E> + OutputPin,
 {
     type Error = E;
 
@@ -77,12 +75,14 @@ where
 /// Inverted wire wrapper
 pub struct Inverted<P>(pub P);
 
+impl<I: ErrorType> ErrorType for Inverted<I> {
+    type Error = I::Error;
+}
+
 impl<I> InputPin for Inverted<I>
 where
     I: InputPin,
 {
-    type Error = I::Error;
-
     fn is_high(&self) -> Result<bool, Self::Error> {
         self.0.is_low()
     }
@@ -96,8 +96,6 @@ impl<O> OutputPin for Inverted<O>
 where
     O: OutputPin,
 {
-    type Error = O::Error;
-
     fn set_low(&mut self) -> Result<(), Self::Error> {
         self.0.set_high()
     }

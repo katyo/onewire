@@ -1,6 +1,6 @@
 use crate::{ds1990::Ds1990, Address, Device, Driver, Error, IoWire, OpCode};
 use core::fmt::Debug;
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::delay::DelayUs;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
@@ -48,7 +48,7 @@ impl OpCode for CommandRw1990 {
 impl Ds1990 {
     fn set_write_lock<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         type_: Ds1990Type,
         lock: bool,
     ) -> Result<bool, Error<W::Error>> {
@@ -83,7 +83,7 @@ impl Ds1990 {
 
     pub fn detect_type<W: IoWire>(
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<Ds1990Type, Error<W::Error>> {
         Ok(
             if Self::set_write_lock(driver, delay, Ds1990Type::Rw1990p1, true)? {
@@ -110,7 +110,7 @@ impl Ds1990 {
     pub fn write_address<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         type_: Ds1990Type,
     ) -> Result<(), Error<W::Error>> {
         match type_ {
@@ -125,7 +125,7 @@ impl Ds1990 {
     pub fn write_address_rw1990<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         type_: Ds1990Type,
     ) -> Result<(), Error<W::Error>> {
         Self::set_write_lock(driver, delay, type_, false)?;
@@ -145,7 +145,7 @@ impl Ds1990 {
     pub fn write_address_tm2004<W: IoWire>(
         &self,
         driver: &mut Driver<W>,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
     ) -> Result<(), Error<W::Error>> {
         let mut crc_read = [0u8; 1];
 
@@ -175,7 +175,7 @@ impl Ds1990 {
 impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
     pub fn write_bytes_rw(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         bytes: &[u8],
         invert: bool,
     ) -> Result<(), E> {
@@ -187,7 +187,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
 
     pub(crate) fn write_byte_rw(
         &mut self,
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayUs,
         byte: u8,
         invert: bool,
     ) -> Result<(), E> {
@@ -200,11 +200,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Ok(())
     }
 
-    pub(crate) fn write_bit_rw(
-        &mut self,
-        delay: &mut impl DelayUs<u16>,
-        high: bool,
-    ) -> Result<(), E> {
+    pub(crate) fn write_bit_rw(&mut self, delay: &mut impl DelayUs, high: bool) -> Result<(), E> {
         // let cli = DisableInterrupts::new();
         self.set_low()?;
         delay.delay_us(if high { 6 } else { 60 });
@@ -214,7 +210,7 @@ impl<E: Debug, W: IoWire<Error = E>> Driver<W> {
         Ok(())
     }
 
-    pub(crate) fn program_pulse(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), E> {
+    pub(crate) fn program_pulse(&mut self, delay: &mut impl DelayUs) -> Result<(), E> {
         // let cli = DisableInterrupts::new();
         self.set_high()?;
         delay.delay_us(600);

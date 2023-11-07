@@ -1,21 +1,20 @@
 [package]
 name = "onewire"
-version = "0.3.13"
-authors = ["Michael Watzko <michael@watzko.de>"]
+version = "1.0.0"
+authors = ["Michael Watzko <michael@watzko.de>", "K. <kayo@illumium.org>"]
 repository = "https://github.com/kellerkindt/onewire"
 description = "OneWire implementation using embedded_hal as abstraction layer, based on arduino OneWire library. WIP"
 keywords = ["embedded", "onewire", "embedded-hal-driver", "1wire", "stm32"]
 categories = ["embedded", "hardware-support", "no-std"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 byteorder = { version = "1", default-features = false }
 
 [dependencies.embedded-hal]
-features = ["unproven"]
-version = "0.2.7"
+version = "1.0.0-rc.1"
 
 [dev-dependencies.cortex-m]
 version = "0.7"
